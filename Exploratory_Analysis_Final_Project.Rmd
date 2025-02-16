@@ -1,0 +1,31 @@
+---
+title: "Milestone2-ExploratoryAnalysis"
+author: "Izzy Valdivia"
+date: "2025-02-15"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### YRDEG Analysis: 
+
+```{r}
+# Load in data
+my_data <- read.delim(file.choose())
+data1 <- read.table("salary.txt",  
+                   header = TRUE) 
+
+# The range of salaries is: 1948 - 1996
+sort(unique(data1$yrdeg))
+
+# Change the year to be easily readable
+data1$adjusted_year <- (data1$yrdeg) + 1900
+```
+
+I would like to explore the relationship between year degree attained, and sex. First I will get the descriptive statistics on the yrdeg field on its own and in collaboration with sex. The minimum year degree attained is 1948, the median is 1972, the mean is 1972.11, and the maximum is 1996.
+
+```{r}
+summary(data1$adjusted_year)
+```
