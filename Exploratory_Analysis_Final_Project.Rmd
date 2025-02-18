@@ -7,13 +7,18 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(lubridate)
+library(gganimate)
+library(dplyr)
+library(av)
 ```
 
-### YRDEG Analysis: 
+### YRDEG Analysis:
 
 ```{r}
 # Load in data
-my_data <- read.delim(file.choose())
+# my_data <- read.delim(file.choose())
 data1 <- read.table("salary.txt",  
                    header = TRUE) 
 
@@ -22,10 +27,76 @@ sort(unique(data1$yrdeg))
 
 # Change the year to be easily readable
 data1$adjusted_year <- (data1$yrdeg) + 1900
+
 ```
 
-I would like to explore the relationship between year degree attained, and sex. First I will get the descriptive statistics on the yrdeg field on its own and in collaboration with sex. The minimum year degree attained is 1948, the median is 1972, the mean is 1972.11, and the maximum is 1996.
+I am going to explore the relationship between year degree attained, and sex. First I will get the descriptive statistics on the yrdeg field on its own and in collaboration with sex. The minimum year degree attained is 1948, the median is 1972, the mean is 1972.11, and the maximum is 1996.
 
 ```{r}
+Female_data1 <- data1 %>% filter(sex=="F")
+Male_data1 <- data1 %>% filter(sex=="M")
 summary(data1$adjusted_year)
+```
+
+```{r}
+ggplot(data1, aes(x=sex, y=adjusted_year, fill=sex))+
+  geom_boxplot() +
+  theme_bw() +
+  scale_fill_manual(values = c("pink", "skyblue")) +
+  labs(y="Degree Year Attained", x="Sex", title="Distribution of year highest degree attained by sex")
+```
+
+```{r}
+p<-ggplot(data1, aes(x=sex, y=adjusted_year)) +
+  geom_violin(scale="area") + 
+  theme_minimal() +
+  labs(title = 'Year: {frame_time}') +
+  transition_time(year)
+
+anim <- animate(p, nframes = length(unique(data1$adjusted_year)), duration = length(unique(data1$adjusted_year)), fps = 1)
+
+# av_encode_video(anim, output = "Year_degree_attained_Violin_by_Year.mp4", framerate = 1)
+```
+
+```{r}
+data1 <- data1 %>% group_by(adjusted_year) %>% mutate(adjusted_year_count = n())
+
+p2 <- ggplot(data1, aes(adjusted_year)) +
+  geom_bar() +
+  theme_bw() + 
+  labs(title="Dist. of Professors based on Year Highest degree attained. School Year: {frame_time}", y ="# of Professors", x="Year Highest Degree Attained")+
+  transition_time(year + 1900) 
+
+anim2 <- animate(p2, nframes = length(unique(data1$adjusted_year)), duration = length(unique(data1$adjusted_year)), fps = 1)
+anim2
+# av_encode_video(anim2, output = "Year_degree_attained_bar_by_Year.mp4", framerate = 1)
+```
+
+```{r}
+library(gganimate)
+
+
+```
+
+```{r}
+# Create the animated plot object
+p <- ggplot(data1, aes(x = adjusted_year, fill = sex)) +
+  geom_bar(position = position_dodge(width = 0.7), width = 0.6) +
+  theme_bw() + 
+  scale_fill_manual(values = c("pink", "skyblue")) +
+  labs(title = "Year: {closest_state}", y = "# of Professors", x="Year Highest Degree Attained") +  
+  transition_states(
+    as.integer(year + 1900),
+    state_length = 12,  # 1.5 seconds * 24 fps = 36 frames
+    transition_length = 0.25 * 24  # Fast transition: 0.5 seconds * 24 fps = 12 frames
+  ) +
+  facet_wrap(~sex)
+
+# Animate separately
+animated_plot <- animate(p, fps = 24, duration = (n_distinct(data1$year) * (1 + 0.5)))
+
+# Display animation
+animated_plot
+
+
 ```
