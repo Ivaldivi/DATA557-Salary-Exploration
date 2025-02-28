@@ -1,0 +1,136 @@
+# This code is meant to normalize the salary field of the salary dataset by year, either considering 
+# field [university school of Arts, Other, Prof] or acroos all fields/schools. It assumes the salary file
+# has been converted to a dataframe named df2. The early part of code include this upload and df2 creation.
+
+library(tidyverse)
+library(dplyr)
+
+################################################
+# to data frame
+# work with csv file "salarycsv.csv" or "salary.csv"
+
+salary_csv <-read.csv("salary.csv")
+head(salary_csv)
+
+#from R Help
+df2<-as.data.frame(salary_csv, row.names = NULL, optional = FALSE,
+                   cut.names = FALSE, col.names = names(colnames), fix.empty.names = TRUE,
+                   stringsAsFactors = FALSE)
+class(df2)
+
+#search for NA & NAN
+sum(is.nan(as.matrix(df2)))
+sum(is.na(as.matrix(df2))) #four NAs found
+
+library(tidyr)
+dim(df2)[1]
+df2 <- df2 %>% drop_na()
+dim(salary_csv)[1]-dim(df2)[1] #confirm length reduced by four
+
+
+pairs(~ yrdeg + startyr + year + salary, data=salary_csv) #correlation works, look up function for more examples
+
+#Assistance from
+#https://stackoverflow.com/questions/7031127/data-frames-and-is-nan?newreg=7dd2895027df480bbabb80939a6d1667
+
+
+
+
+###
+# Asked Gemini for help translating JW's python code below to R
+#
+# z-Normalization method for groupby.transform
+# def normalize(x):
+#  if np.std(x) == 0:  #if stdev of 0 would cause a failure in calculation, just assign a zero to the normalization
+#  x_norm = 0
+# else:
+#   x_norm = (x - np.mean(x))/np.std(x) # z-normalization
+# return x_norm
+#
+# df.groupby('user_id')['quantity'].transform(normalize)
+#
+###
+
+
+## new R normalizing function
+
+normalize_rr <- function(x)
+{
+  std_dev <- sd(x)
+  if (std_dev == 0) 
+  {
+    0 #if stdev of 0 would cause a failure in calculation, just assign a zero to the normalization
+  } else
+  {
+    (x - mean(x)) / std_dev # z-normalization
+  }
+}  
+
+## new groupbys
+######################################################################
+#Add salary normalization by year
+ df2 <- df2 %>%
+   group_by(year) %>%
+   mutate(normalized_salary = normalize_rr(salary)) %>%
+   ungroup()
+ 
+#check for mean 0
+ summ <- df2 %>%
+   group_by(year) %>%
+   summarize(element = mean(normalized_salary),  .groups = "drop") 
+  print(summ, n=24)
+ 
+ #check for sd 0
+ summ <- df2 %>%
+   group_by(year) %>%
+   summarize(element = sd(normalized_salary),  .groups = "drop") 
+ print(summ, n=24)
+################################################### 
+
+ 
+############################################# 
+#Add salary normalization by year and field
+ df2 <- df2 %>%
+   group_by(year, field) %>%
+   mutate(normalized_salary_field = normalize_r(salary)) %>%
+   ungroup()
+ 
+#CHECK for mean 0
+ summ <- df2 %>%
+   group_by(year,field) %>%
+   summarize(element = mean(normalized_salary_field),  .groups = "drop") %>%
+   pivot_wider(names_from = field, values_from = element)
+ #  replace_na(list(X = 0, Y=0)) # Replaces NA with 0 for both X and Y
+ print(summ, n=24) 
+ 
+#CHECK for sd 0
+ summ <- df2 %>%
+   group_by(year,field) %>%
+   summarize(element = sd(normalized_salary_field),  .groups = "drop") %>%
+   pivot_wider(names_from = field, values_from = element)
+ #  replace_na(list(X = 0, Y=0)) # Replaces NA with 0 for both X and Y
+ print(summ, n=24) 
+ 
+######################################################
+df2
+
+ ############################################# 
+ #Add salary normalization by year and field
+
+ #look at mean of normalized_salary [for all depts] by year
+ summ <- df2 %>%
+   group_by(year,sex) %>%
+   summarize(element = mean(normalized_salary),  .groups = "drop") %>%
+   pivot_wider(names_from = sex, values_from = element)
+ #  replace_na(list(X = 0, Y=0)) # Replaces NA with 0 for both X and Y
+ print(summ, n=24) 
+ 
+ #look at mean of normalized_salary_field by each dept by year
+ summ <- df2 %>%
+   group_by(year,field, sex) %>%
+   summarize(element = mean(normalized_salary_field),  .groups = "drop") %>%
+   pivot_wider(names_from = field, values_from = element)
+ #  replace_na(list(X = 0, Y=0)) # Replaces NA with 0 for both X and Y
+ print(summ, n=24) 
+ 
+ ######################################################
