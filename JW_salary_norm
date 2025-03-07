@@ -92,7 +92,7 @@ normalize_rr <- function(x)
 #Add salary normalization by year and field
  df2 <- df2 %>%
    group_by(year, field) %>%
-   mutate(normalized_salary_field = normalize_r(salary)) %>%
+   mutate(normalized_salary_field = normalize_rr(salary)) %>%
    ungroup()
  
 #CHECK for mean 0
