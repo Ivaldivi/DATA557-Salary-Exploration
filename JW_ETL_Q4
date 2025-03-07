@@ -1,0 +1,148 @@
+##########################################################################
+#
+#       ETL base for question number four
+#
+#       Two parts, file UPLOAD and file PROCES
+#
+#       JW with help from cinco siete class, Prof W, & citations
+#
+#       Group Five
+#
+###########################################################################
+#############################################################################
+
+# PART ONE UPLOAD
+# to data frame
+# work with csv file "salarycsv.csv" or "salary.csv"
+
+library(tidyverse)
+library(dplyr)
+
+salary_csv <-read.csv("salary.csv")
+head(salary_csv)
+
+#from R Help
+df2<-as.data.frame(salary_csv, row.names = NULL, optional = FALSE,
+                   cut.names = FALSE, col.names = names(colnames), fix.empty.names = TRUE,
+                   stringsAsFactors = FALSE)
+class(df2)
+
+#search for NA & NAN
+sum(is.nan(as.matrix(df2)))
+sum(is.na(as.matrix(df2))) #four NAs found
+
+library(tidyr)
+dim(df2)[1]
+df2 <- df2 %>% drop_na()
+dim(salary_csv)[1]-dim(df2)[1] #confirm length reduced by four
+
+pairs(~ yrdeg + startyr + year + salary, data=salary_csv) #correlation works, look up function for more examples
+
+#Assistance from
+#https://stackoverflow.com/questions/7031127/data-frames-and-is-nan?newreg=7dd2895027df480bbabb80939a6d1667
+
+# PART TWO PROCESS
+
+##################################### 
+#### This code finds all professors from the salary file that tracked
+#### from Assistant to Associate to Full Professor and than isolates their
+#### status at Associate professor showing the number of years at that position
+#### before promotion.
+#### 
+#### Coding assistant from a variety of places noted
+####
+#### The end of the file removes those individuals promoted in 1994
+####
+#### Input file is df2 is a data frame of the salary file
+#### the two outputs are #1 promoted_final [no 95 promotions] and 
+#### #2 promoted_final_no94 [no 94 or 95]. The second file resulted in 
+#### AP start from 77-90 and AP last year from 78-93 (i.e. FP in 79-94)
+####
+#### The intent is to allow flexibility in picking the cutoff for time to promotion
+#### 
+#### JW Group Five
+#####################################
+
+#1 add max and min year to each row of df
+# https://www.andrewheiss.com/blog/2024/04/04/group_by-summarize-ungroup-animations/
+# help from Andrew Heiss
+
+temp<-df2|> group_by(rank,id) |> mutate(max_year_rank = max(year))
+temp<-df2|> group_by(rank,id) |> mutate(max_year_rank = max(year))
+temp<-temp|> group_by(rank,id) |> mutate(min_year_rank = min(year))
+print(temp, n=60)
+
+
+#2 find all faculty would started as Assistant 
+#help from https://stackoverflow.com/questions/11612235/select-rows-from-a-data-frame-based-on-values-in-a-vector
+temp1<-temp[(temp$rank=="Assist"),]
+select<-temp1[(temp1$rank=="Assist"),]$id #all ids associated with assistant
+ever_assistant<-filter(temp, id %in% select) #all faculty who were ever assistant
+
+#3 Of those who started as assistant find those ids promoted to associate
+select2<-ever_assistant[(ever_assistant$rank=="Assoc"),]$id #find ids that made it to Assoc
+assoc_startas_assist<-filter(ever_assistant, id %in% select2) #create new df with only those promoted to associate
+print(assoc_startas_assist,n=10) 
+
+#4 find those who made FP and go back to create a file of only those who made it to full
+#but tracking their entire careers from Assistant to Full
+temp2<-assoc_startas_assist[(assoc_startas_assist$rank=="Full"),] #temp2 is df FP rows from assoc_start_as_assist
+select3<-temp2[(temp2$rank=="Full"),]$id #ids of those promoted to fp
+made_full<-filter(assoc_startas_assist, id %in% select3) #apply list of ids making full to those making to associate
+
+#5Add key fields - data still by year - and then limit to only years when faculty were Assoc
+made_full<-made_full%>% mutate(years_at_assoc = 1 + (max_year_rank) - min_year_rank) #add years exp, 1 + delta in start & endtime at rank
+made_full<-made_full%>% mutate(years_exp_at_full_prom = (max_year_rank) - yrdeg) #add experience since degree
+temp3<-made_full[(made_full$rank=="Assoc"),] #limit to time as associate
+
+### OUTPUT FILES #####
+
+#6 Now create a grouped df with each unique id only, help from below
+#https://r02pro.github.io/create-grouped-summaries.html#create-grouped-summaries
+#output1
+promoted_final<-temp3 %>% group_by(id, sex, deg, yrdeg, field, startyr, rank, max_year_rank, min_year_rank) %>% 
+  summarize(years_at_assoc = mean(years_at_assoc, na.rm = TRUE))
+print(promoted_final,n=10) #check
+#output2
+promoted_final_no94<-promoted_final[(promoted_final$max_year_rank!=94),] #remove those whose last year at Assoc was 94
+
+### DISPLAY #####
+### help from Gemini creating pivot tables for different project
+
+#7display
+#everyone who was promoted removing 1995 implicitly
+summ <- promoted_final %>%
+  group_by(sex, years_at_assoc) %>%
+  summarize(element = n_distinct(id),  .groups = "drop") %>%
+  pivot_wider(names_from = sex, values_from = element)
+print(summ, n=60)
+
+#everyone who was promoted removing 1994 [and 1995]
+exp_at_prom_to_full <- promoted_final_no94 %>%
+  group_by(sex, years_at_assoc) %>%
+  summarize(element = n_distinct(id),  .groups = "drop") %>%
+  pivot_wider(names_from = sex, values_from = element)
+print(exp_at_prom_to_full, n=60)
+
+###Cross shows AP start from 77-90 and AP last year from 78-93
+xtabs(min_year_rank~max_year_rank, promoted_final_no94)
+y <- promoted_final_no94 %>%
+  group_by(max_year_rank, min_year_rank) %>%
+  summarize(element = n_distinct(id),  .groups = "drop") %>%
+  pivot_wider(names_from = max_year_rank, values_from = element)
+print(y, n=60)
+
+### BOXPLOT AND HISTOGRAM ##########
+male_prom = promoted_final_no94[(promoted_final_no94$sex=="M"),]$years_at_assoc
+female_prom = promoted_final_no94[(promoted_final_no94$sex=="F"),]$years_at_assoc
+
+hist(male_prom, breaks = 40, col=rgb(1,0,0,1/4), xlim=c(0,15), ylim=c(0,45), main = "Years at AP before promotion to FP, F/M ~ purp/peach")
+hist(female_prom, breaks = 25, col=rgb(0,0,1,1/4), xlim=c(0,15), ylim=c(0,45), add = TRUE)
+
+boxplot(promoted_final_no94$years_at_assoc ~ promoted_final_no94$sex)
+
+## TABLE Count SD Mean by Sex
+comp <- promoted_final_no94 %>%
+  group_by(sex) %>%
+  summarize(sample_count = sum(years_at_assoc>0), sd_years_at_assoc = sd(years_at_assoc), mean_years_at_assoc = mean(years_at_assoc))
+print(comp)
